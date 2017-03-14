@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# Take an xyz (movie) file and wrap the coordinates back to the
+# periodic supercell. NB! Assumes an orthogonal supercell and that the
+# cell size is given by the three last fields of the second row of the
+# xyz file.
+#
+# Eero Holmstrom, 2016
+#
+
+# usage
+if [[ -z "$4" ]];
+then
+    echo "Usage: $(basename $0) [file.xyz] [x0] [y0] [z0]"
+    exit 1;
+fi
+
+# assign input parameters
+infile=$1
+x0=$2
+y0=$3
+z0=$4
+
+if [[ ! -e $infile ]];
+then
+    echo "File $infile not found! Exiting."
+    exit 1;
+fi
+
+# find size of supercell
+xsize=$(awk '{n++}(n==2){print $(NF-2)}' $infile)
+ysize=$(awk '{n++}(n==2){print $(NF-1)}' $infile)
+zsize=$(awk '{n++}(n==2){print $(NF)}' $infile)
+
+echo ""
+printf "Found periodic supercell of dimensions %5.8f A, %5.8f A, %5.8f A.\n" $xsize $ysize $zsize
+printf "Using %5.8f A, %5.8f A, %5.8f A as the origin.\n" $x0 $y0 $z0
+echo ""
+
+echo "Now wrapping given xyz movie to the given supercell..."
+
+awk -v x0=$x0 -v y0=$y0 -v z0=$z0 -v xsize=$xsize -v ysize=$ysize -v zsize=$zsize 'BEGIN{natoms=-999; n=0;}
+
+{n++;}
+(n==natoms+3){n=1;}
+
+(n==1){natoms=$1; print natoms}
+(n==2){print $0, "wrapped to supercell of size", xsize, ysize, zsize}
+(n>=3){type=$1; x=$2; y=$3; z=$4;
+
+if(x<x0) {for(i=1; x<x0; i++){x=x+xsize}} else if(x>=x0+xsize) {for(i=1; x>=x0+xsize; i++){x=x-xsize}};
+if(y<y0) {for(i=1; y<y0; i++){y=y+ysize}} else if(y>=y0+ysize) {for(i=1; y>=y0+ysize; i++){y=y-ysize}};
+if(z<z0) {for(i=1; z<z0; i++){z=z+zsize}} else if(z>=z0+zsize) {for(i=1; z>=z0+zsize; i++){z=z-zsize}};
+
+print type, x, y, z;
+
+}' $infile > $infile.wrapped.xyz
+
+echo "Done. Wrapped trajectory output to $infile.wrapped.xyz"
+echo ""
+echo "Exiting."
+echo ""
+
+exit 0;
